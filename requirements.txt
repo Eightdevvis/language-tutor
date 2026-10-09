@@ -1,0 +1,9 @@
+# Sprach-Tutor — was der Server und das Zimmer brauchen.
+flask>=3.0
+anthropic>=0.40      # nur für den Anbieter claude
+openai>=1.40         # für alle OpenAI-kompatiblen Anbieter (qwen, …)
+fsrs>=4.0            # Wiederholung im Gespräch (fehlt es, ist das Feature still aus)
+pygame>=2.5          # das Zimmer
+sounddevice          # Mikro im Zimmer
+webrtcvad            # Sprach-Erkennung im Mikro
+pytest>=8.0

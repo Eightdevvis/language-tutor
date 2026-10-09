@@ -4,7 +4,7 @@ Sasha 2026-09-18: »vor allem, dass die Vokabelstates der gelernten Vokabeln
 jeweils nur zum Spielstand gehören und nicht übereinander fließen.« Jeder Test
 hier ist eine konkrete Art, wie Stände früher ineinander laufen konnten —
 und zeigt, dass sie es nicht mehr tun. Alles gegen echte Dateien in tmp_path,
-mit den echten Modulen (tools, memory, srs, session, tutor_port); nur das
+mit den echten Modulen (tools, memory, srs, session, dienst); nur das
 Sprachmodell wird ersetzt.
 """
 
@@ -19,7 +19,6 @@ import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-sys.path.insert(0, os.path.join(ROOT, "core"))
 
 from tutor import staende, tools, memory, srs, session, config   # noqa: E402
 
@@ -144,8 +143,7 @@ def test_notiz_wird_verworfen_wenn_stand_waehrenddessen_wechselt(welt, monkeypat
     b = staende.anlegen(welt, "B", lang="es")
     verworfen = []
 
-    import ai_backends
-    monkeypatch.setattr(ai_backends, "status", lambda: {"local": True})
+    monkeypatch.setattr(memory, "_verdichter", lambda provider: "local")
 
     def fake_distill(backend, provider, model, user_msg):
         staende.waehlen(welt, b)              # Sasha klickt mitten im LLM-Aufruf um
@@ -175,8 +173,8 @@ def test_antwort_wird_verworfen_wenn_stand_waehrend_des_streams_wechselt(welt, m
         yield "hola "
         staende.waehlen(welt, b)              # Wechsel mitten im Stream
         yield "guapa"
-    import ai
-    monkeypatch.setattr(ai, "chat_stream", fake_stream)
+    from tutor.modell import weg_ollama
+    monkeypatch.setattr(weg_ollama, "fahren", fake_stream)
     monkeypatch.setattr(session, "_resolve",
                         lambda: (session.langs.get("es"), "ollama", {"kind": "ollama"}, "x"))
     monkeypatch.setattr(memory, "remember", lambda *a, **k: pytest.fail("remember darf nicht laufen"))
@@ -274,19 +272,19 @@ def test_level_beim_anlegen_trifft_nur_den_neuen_stand(welt):
     assert tools.core_coverage("es")[0] == 0 and not tools.core_graduated("es")
 
 
-# ── 5. Über den Kern (tutor_port), wie die Fronten es tun ────────────────
+# ── 5. Über den Dienst des Servers (tutor/dienst.py), wie das Zimmer es tut ──
 
-def test_tutor_port_end_to_end_zwei_sprachen(welt):
-    import tutor_port
+def test_dienst_end_to_end_zwei_sprachen(welt):
+    from tutor import dienst as tutor_port
     r = tutor_port.stand_anlegen("Lucía", lang="es", level=1)
     assert r["ok"]
-    assert tutor_port.config()["lang"] == "es" and tutor_port.config()["persona_name"] == "Lucía"
+    assert tutor_port.einstellungen()["lang"] == "es" and tutor_port.einstellungen()["persona_name"] == "Lucía"
     es_got = tutor_port.assessment()["got"]
     assert es_got > 0                                       # Level 1 hat Kernwörter markiert
 
     r = tutor_port.stand_anlegen("Lena", lang="de", level=0)
     assert r["ok"]
-    cf = tutor_port.config()
+    cf = tutor_port.einstellungen()
     assert cf["lang"] == "de" and cf["persona_name"] == "Lena"
     assert tutor_port.assessment()["got"] == 0 and tutor_port.assessment()["lang"] == "de"
     assert tutor_port.debug_snapshot()["lang"] == "de"
@@ -299,5 +297,5 @@ def test_tutor_port_end_to_end_zwei_sprachen(welt):
     assert tutor_port.assessment()["got"] == es_got, "es-Stand hat die de-Antwort nicht gesehen"
 
     # Sprache ist keine Einstellung mehr
-    assert "error" in tutor_port.config({"lang": "zh"})
+    assert "error" in tutor_port.einstellungen({"lang": "zh"})
     assert tutor_port.stand_anlegen("X", lang="fr")["ok"] is False, "Skizzen-Sprache nicht anlegbar"

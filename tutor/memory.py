@@ -33,12 +33,13 @@
 import os
 import json
 
+from . import pfade
 from . import staende   # Spielstaende: welcher Lernstand gerade laeuft
 from threading import Lock
 
 from . import langs as tutor_langs
 
-_DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+_DATA_DIR = pfade.daten_ordner()   # seit 2026-10-09 wählbar (tutor/pfade.py)
 
 # History wird auf Disk gehalten, damit die Persona dich zwischen Sessions
 # nicht vergisst. Storage-Cap großzügig; gesendet wird eh nur ein Fenster
@@ -139,21 +140,15 @@ def remember(user_text: str, ai_text: str, lang: str | None = None,
     Destilliert einen Persona-Turn in die GROB-Notizen (nie den Core-Graphen).
     Ein leichter LLM-Pass fügt neue wichtige Fakten/Themen hinzu und deckelt.
 
-    Backend KAPAZITÄTSBASIERT (ai_backends): lokales Ollama da → dort; sonst über
+    Backend KAPAZITÄTSBASIERT (_verdichter): lokales Ollama da → dort; sonst über
     den Cloud-Anbieter der Persona; nichts da → auslassen. Blockiert (~1s) → der
     Caller lässt das in einem Thread laufen. Ein Fehler darf das Gespräch nie
     kippen (Gedächtnis ist Beiwerk).
     """
     try:
-        import ai_backends
-        st = ai_backends.status()
-        if st.get("local"):
-            backend = "local"
-        elif st.get("cloud"):
-            backend  = "cloud"
-            provider = provider or st.get("cloud_provider")
-        else:
-            return   # kein Backend → diesen Turn nicht merken
+        backend = _verdichter(provider)
+        if backend is None:
+            return   # kein Modell da → diesen Turn nicht merken
 
         # Token VOR dem Laden: zwischen Laden und Speichern liegt ein LLM-Aufruf
         # (~1 s). Wechselt Sasha in der Zeit den Spielstand, würden die Notizen
@@ -177,6 +172,19 @@ def remember(user_text: str, ai_text: str, lang: str | None = None,
                 _save_notes(new, lang)
     except Exception:
         pass
+
+
+def _verdichter(provider):
+    """Wer verdichtet? Lokales Ollama, wenn da (kostet nichts); sonst derselbe
+    Cloud-Anbieter, der gerade redet — wenn er fahren darf; sonst keiner.
+    Seit 2026-10-09 eigene Prüfung (tutor/modell), vorher ZENTRALEs
+    ai_backends.status()."""
+    from .modell import leitung, weg_ollama
+    if weg_ollama.erreichbar():
+        return "local"
+    if provider and provider != "local" and not leitung.warum_nicht(provider):
+        return "cloud"
+    return None
 
 
 def _distill(backend: str, provider: str | None, model: str | None, user_msg: str) -> str:

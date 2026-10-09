@@ -40,6 +40,7 @@ import os
 import random
 import re
 
+from . import pfade
 from . import staende   # Spielstaende: welcher Lernstand gerade laeuft
 from threading import Lock
 
@@ -84,7 +85,7 @@ def word_status(e: dict) -> str:
         return 'understood'
     return 'new'
 
-_DATA_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+_DATA_ROOT = pfade.daten_ordner()   # seit 2026-10-09 wählbar (tutor/pfade.py)
 
 
 # ── Aktive Sprache + Pfade ──────────────────────────────────────────────
@@ -1242,11 +1243,7 @@ def execute_tool(name: str, args: dict) -> str:
     fn = _ALLOWED.get(name)
     if fn is None:
         debug.emit('ai.tool', name=name, args=args, result='[abgelehnt: nicht in Allowlist]')
-        try:
-            import state
-            state.push_log(f"⚠ TUTOR-SANDBOX: Tool '{name}' abgelehnt (nicht in der Allowlist)")
-        except Exception:
-            pass
+        print(f"⚠ TUTOR-SANDBOX: Tool '{name}' abgelehnt (nicht in der Allowlist)", flush=True)
         return (f"[Abgelehnt: '{name}' ist kein Tutor-Tool – die Tutor-/Cloud-AI "
                 f"darf nur die Tutor-Tools nutzen.]")
     result = fn(args or {})

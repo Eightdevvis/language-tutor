@@ -1,52 +1,43 @@
 # tutor/anbieter.py
 #
-# Die Naht des Tutors zur EINEN Straße des Kerns (seit 2026-10-08).
+# Die Naht des Tutors zu seiner Modell-Leitung (tutor/modell/).
 #
-# Vorher hatte der Tutor eine eigene Anbieter-Liste (tutor/providers.py) und
-# zwei eigene Cloud-Schleifen (tutor/cloud.py für Anthropic,
-# tutor/openai_compat.py für Qwen & Co.) — eine zweite Wahrheit über Endpunkte
-# und Modelle, und jede Verbesserung am Kern (Kosten buchen, Stoppen, Fehler
-# als Event statt Antworttext, Tool-Fehler fangen) kam beim Tutor nie an.
-# Sasha: „eine straße, wo jedes auto drauf fahren könnte".
-#
-# Jetzt: Anbieter-Liste = core/providers.py (inkl. Datenschutz-Angabe), Weg =
-# kern.fahrzeug()/kern.fahren(). Dieses Modul ist das EINZIGE im Tutor, das
-# diese beiden Kern-Module anfasst — wer den Tutor je wieder rausziehen will,
-# ersetzt nur diese Datei.
-#
-# Sandbox bleibt: fahren() bekommt die Vokabel-Tools des Tutors und
-# tutor.tools.execute_tool (geschlossene Allowlist). Der Kern schaltet für ein
-# fremdes Tool-Set Gedächtnis, Gate und Bild-Marker ab.
+# Bis 2026-10-08 hatte der Tutor eigene Cloud-Schleifen, vom 08.10. bis 09.10.
+# fuhr er auf der Straße von ZENTRALE (kern.fahren). Seit 2026-10-09 ist er ein
+# eigenes Programm und fährt auf seiner eigenen kleinen Leitung — mit eigenem
+# Schlüssel und eigenem Budget. Die Aufrufer (session, memory) sehen davon
+# nichts: dieses Modul behält seine Schnittstelle.
 #
 # Einstellungen (tutor/config.py, Env TUTOR_<NAME>):
 #   max_tokens   harter Deckel je Antwort. Standard je Art: OpenAI-kompatibel
-#                140 (gegen echtes qwen gemessen, memory/tutor/
-#                tutor_persona_tuning.md), Anthropic 2000 (Denken zählt mit).
-#                Ein Wert im Sprachprofil (max_tokens) geht vor.
-#   temperature  0.4 (nur OpenAI-kompatibel; Anthropic lehnt sie ab Opus 4.7 ab)
+#                140 (gegen echtes qwen gemessen, docs/tutor_persona_tuning.md),
+#                Anthropic 2000 (Denken zählt mit). Ein Wert im Sprachprofil
+#                (max_tokens) geht vor.
+#   temperature  0.4 (nur OpenAI-kompatibel)
 #   effort       'low' (nur Anthropic)
 
-import kern          # basic core: die Straße
-import providers     # basic core: die eine Anbieter-Liste
-
 from . import config
+from .modell import anbieter_liste, leitung, schluessel
 
-LOKAL = providers.LOKAL
+LOKAL = anbieter_liste.LOKAL
 
 _MAX_TOKENS_JE_ART = {"openai_compat": 140, "anthropic": 2000}
 
 
 def eintrag(name: str) -> dict:
-    """Anbieter-Eintrag (lokal oder Cloud); unbekannt → der lokale."""
-    return providers.eintrag(name) or providers.eintrag(LOKAL)
+    """Anbieter-Eintrag; unbekannt → der lokale. 'kind' bleibt als Name für
+    die Art erhalten (session.backend_kind fragt danach)."""
+    e = dict(anbieter_liste.eintrag(name) or anbieter_liste.eintrag(LOKAL))
+    e["kind"] = e.get("art")
+    return e
 
 
 def bekannt(name: str) -> bool:
-    return bool(providers.eintrag(name))
+    return bool(anbieter_liste.eintrag(name))
 
 
 def trains_on_data(name: str) -> bool:
-    return providers.trains_on_data(name)
+    return anbieter_liste.trains_on_data(name)
 
 
 def default_model(name: str):
@@ -54,22 +45,19 @@ def default_model(name: str):
 
 
 def waehlbar(name: str) -> bool:
-    """Kann der Tutor diesen Anbieter jetzt nehmen? Lokal immer; Cloud nur
-    mit Key. (Ersetzt das alte `enabled` der Tutor-Liste: dort hieß es
-    „verdrahtet" — auf der einen Straße ist jeder Anbieter verdrahtet.)"""
-    import os
-    e = eintrag(name)
-    if e.get("kind") == "ollama":
+    """Kann der Tutor diesen Anbieter jetzt nehmen? Lokal immer; Cloud nur mit
+    eigenem Schlüssel."""
+    if eintrag(name).get("art") == "ollama":
         return True
-    return bool(os.environ.get(e.get("key_env") or ""))
+    return schluessel.hat(name)
 
 
 def liste() -> list:
-    """Alle Anbieter fürs UI (Einstellungen im Zimmer)."""
+    """Alle Anbieter fürs Zimmer (Einstellungen)."""
     return [{"name": n, "default_model": e.get("default_model"),
-             "trains_on_data": providers.trains_on_data(n),
+             "trains_on_data": anbieter_liste.trains_on_data(n),
              "jurisdiction": e.get("jurisdiction"), "enabled": waehlbar(n)}
-            for n, e in providers.alle().items()]
+            for n, e in anbieter_liste.alle().items()]
 
 
 def _zahl(name, standard, art=float):
@@ -82,14 +70,15 @@ def _zahl(name, standard, art=float):
 
 def fahren(anbieter: str, modell, verlauf: list, *, system: str, tools: list,
            tool_executor, max_tokens: int = None):
-    """Einen Tutor-Zug fahren. Generator mit dem Event-Protokoll des Kerns
-    (Text-Tokens + dicts: werkzeug, reflect, fehler) — der Aufrufer filtert.
-    max_tokens: Wert aus dem Sprachprofil (None → Einstellung → Standard je Art)."""
-    fz = kern.fahrzeug(anbieter if bekannt(anbieter) else LOKAL, modell)
+    """Einen Tutor-Zug fahren. Generator: Text-Tokens + dicts (werkzeug,
+    reflect, fehler) — der Aufrufer filtert."""
+    if not bekannt(anbieter):
+        anbieter = LOKAL
+    art = anbieter_liste.eintrag(anbieter).get("art")
     # Reihenfolge wie vorher: Sprachprofil > Einstellung > Standard je Art.
-    deckel = max_tokens or _zahl("max_tokens", None, int) \
-        or _MAX_TOKENS_JE_ART.get(fz.art)
-    yield from kern.fahren(
-        fz, verlauf, system=system, tools=tools, tool_executor=tool_executor,
-        max_tokens=deckel, temperatur=_zahl("temperature", 0.4),
-        effort=str(config.setting("effort", "low") or "low"))
+    deckel = max_tokens or _zahl("max_tokens", None, int) or _MAX_TOKENS_JE_ART.get(art)
+    yield from leitung.fahren(
+        anbieter, modell, verlauf, system=system, tools=tools,
+        ausfuehren=tool_executor, max_tokens=deckel,
+        temperatur=_zahl("temperature", 0.4),
+        effort=str(config.setting("effort") or "low"))

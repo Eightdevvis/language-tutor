@@ -1,8 +1,14 @@
 # Sprach-Tutor — Index
 
-Der Tutor ist ein **eigenes Projekt** in `tutor/`, am Stück rausziehbar. Die
-einzige Naht zum Kern ist `core/tutor_port.py`; Keys und die cloud/local-Wahl
-gehören dem Kern, nie dem Tutor.
+Der Tutor ist ein **eigenes Programm** (dieses Repo, seit 2026-10-09; vorher
+in ZENTRALE unter `tutor/`). Er ist die erste App nach ZENTRALEs Hub-Bauplan:
+eigener Server-Prozess, eigener Schlüssel, eigenes Budget, eigene
+Einstellungen. Was er vom Hub will, steht in `app.toml`. Einstieg zum
+Betrieb: [../README.md](../README.md).
+
+Die Doku unten stammt zum Teil aus der Zeit in ZENTRALE; wo dort `core/…`,
+`ui/routen/…` oder `/api/tutor` über ZENTRALE steht, ist das Geschichte —
+die Struktur von heute steht im Bauplan.
 
 | Was du wissen willst | Datei |
 |---|---|
@@ -14,9 +20,9 @@ gehören dem Kern, nie dem Tutor.
 | Wie die Persona aussieht: gemalte Puppe statt Polygone, Drehpunkte, Mal-Schablone | [tutor_puppe.md](tutor_puppe.md) |
 | **Diagnose 2026-10-08** — Sashas Beschwerden (Dauergerede, Zufall, Niveau, „que?", Mikro, STT, Optik, Bilder) je mit Ursache (Datei:Zeile), Strategie, was gebaut ist, was offen bleibt | [diagnose_2026-10-08.md](diagnose_2026-10-08.md) |
 
-## Grenze zum Kern
+## Grenze zum Hub
 
 Der Tutor hat sein **eigenes** Gedächtnis (`tutor/memory.py`, Notiz-Modell) —
-**nicht** den Konzept-Graphen der Kern-KI. Die beiden Speicher fassen sich nie
-an. Wie die Kern-KI sich erinnert, steht in
-[../ki/ki_system.md](../ki/ki_system.md).
+**nicht** das Gedächtnis von Sashas Assistenten in ZENTRALE. Die beiden
+Speicher fassen sich nie an, und seit dem Umzug kann der Tutor auch keinen
+Code von ZENTRALE mehr aufrufen (`tests/test_tutor_grenze.py`).

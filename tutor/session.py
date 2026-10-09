@@ -276,9 +276,8 @@ def backend_kind() -> str:
     """'ollama' (lokal) | 'anthropic' | 'openai_compat' (beide = Cloud) — welche
     Art Backend der aktuell aufgelöste Provider braucht.
 
-    Teil des KONTRAKTS zum Kern: core/tutor_port.py fragt das, um die ZENTRALE-
-    Drossel (cloud_enabled/local_enabled) anzuwenden. Der Tutor selbst kennt die
-    Drossel nicht — siehe available()."""
+    (Bis 2026-10-09 fragte ZENTRALE das für seine Drossel; heute nur noch
+    eine Auskunft.)"""
     _prof, _pname, provider, _model = _resolve()
     return provider.get("kind") or "ollama"
 
@@ -307,26 +306,27 @@ def _reachable(host: str, port: int = 443, timeout: float = 2.0) -> bool:
 
 
 def available() -> bool:
-    """Ist der Tutor mit dem aktuell aufgelösten Provider nutzbar?
+    """Ist der Tutor mit dem aktuell aufgelösten Anbieter nutzbar?
 
-    REIN KAPAZITÄT: ist das Backend meines Providers erreichbar — lokaler
-    Provider → Ollama da; Cloud-Provider → Key gesetzt + Host erreichbar.
+    Lokal → Ollama erreichbar. Cloud → eigener Schlüssel da, Budget nicht
+    aufgebraucht, Ziel „direkt", Host erreichbar. Seit 2026-10-09 gibt es
+    keine ZENTRALE-Drossel mehr davor: der Tutor ist ein eigenes Programm mit
+    eigenem Budget (tutor/modell/leitung.py)."""
+    return not unavailable_reason()
 
-    Kennt die ZENTRALE-Drossel (cloud_enabled/local_enabled) BEWUSST NICHT.
-    Die ist Core-Policy und sitzt in core/tutor_port.py — der Port fragt erst
-    die Drossel, dann das hier. Vorher hing der Tutor über ai_backends direkt an
-    der Core-Config; damit war er nicht rausziehbar und die Drossel wohnte in
-    einer Tutor-Datei (Umbau 2026-07-16). Wer den Tutor GATEN will, fragt den
-    Port, nicht das hier."""
-    _prof, _pname, provider, _model = _resolve()
-    if provider.get("kind") == "ollama":
-        import ai_backends
-        return ai_backends.local_ok()
-    key = provider.get("key_env")
-    if key and not os.environ.get(key):
-        return False
-    base = provider.get("base_url") or "https://api.anthropic.com"
-    return _reachable(urlparse(base).hostname)
+
+def unavailable_reason() -> str:
+    """Warum geht es gerade nicht? Klartext fürs Zimmer — '' heißt: es geht."""
+    from .modell import leitung
+    _prof, pname, provider, _model = _resolve()
+    grund = leitung.warum_nicht(pname)
+    if grund:
+        return grund
+    if provider.get("kind") != "ollama":
+        base = provider.get("base_url") or "https://api.anthropic.com"
+        if not _reachable(urlparse(base).hostname):
+            return "Der Anbieter ist gerade nicht erreichbar (Internet?)."
+    return ""
 
 
 def privacy_notice():
@@ -359,13 +359,8 @@ def activate():
         notice = (f"⚠ DATENSCHUTZ: Provider '{pname}' ({provider.get('jurisdiction')}) "
                   f"trainiert/nutzt offiziell deine Eingaben. Modell {model}, "
                   f"Sprache {prof['name']}.")
-        try:
-            import state
-            state.push_log("⚠⚠⚠ TUTOR PRIVACY-WARNUNG ⚠⚠⚠")
-            state.push_log(notice)
-        except Exception:
-            pass
-        print(notice)
+        print("⚠⚠⚠ TUTOR PRIVACY-WARNUNG ⚠⚠⚠", flush=True)
+        print(notice, flush=True)
 
     # KEIN rohes History-Replay mehr über Sessions (führte zu Filler-Loops und ist
     # auch unnötig): Kontinuität kommt aus den GROB-Notizen (memory.context,
@@ -774,8 +769,7 @@ def _graduierung_pruefen(prof, lang):
     try:
         if tools.check_graduation(lang):
             got, total = tools.core_coverage(lang)
-            import state
-            state.push_log(
+            print(
                 f"🎓 Kern-Wortschatz gemeistert ({prof.get('name', lang)}): "
                 f"{got}/{total} Kern-Wörter — ab jetzt freie Konversation.")
     except Exception:

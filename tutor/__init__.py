@@ -1,24 +1,15 @@
 # tutor/ — der Sprach-Tutor (Persona-Portal).
 #
-# EIGENES PROJEKT, das in ZENTRALE mitwohnt. Dieser Ordner ist so geschnitten,
-# dass er als Ganzes rausziehbar ist: Code, Prompts, Vokabeln und Laufzeit-Daten
-# (tutor/data/) liegen hier drin, nichts davon in core/.
+# EIGENES PROGRAMM (seit 2026-10-09 eigenes Repo „language-tutor"; vorher
+# wohnte es in ZENTRALE mit). Es ist die erste App nach ZENTRALEs Hub-Bauplan:
+# eigener Prozess (tutor/server.py), eigener Schlüssel und eigenes Budget
+# (tutor/modell/), eigene Einstellungen (tutor/config.py). Was die App vom Hub
+# will, steht in app.toml.
 #
-# ── Wie ZENTRALE hier reingreift ────────────────────────────────────────
-# NUR über core/tutor_port.py. Kein Core-/UI-Modul importiert `tutor.*` direkt —
-# der Port ist die einzige Naht, und er legt auch den sys.path-Bootstrap hin.
-# Fehlt dieser Ordner komplett, läuft ZENTRALE normal weiter
-# (tutor_port.present() → False).
-#
-# ── Was der Tutor vom „basic core" braucht (bewusst klein) ──────────────
-#   kern.fahrzeug/fahren  – die EINE Straße zu allen Modellen (lokal + Cloud),
-#   providers             – die eine Anbieter-Liste; beides NUR über
-#                           tutor/anbieter.py (seit 2026-10-08, vorher eigene
-#                           Liste + eigene Cloud-Schleifen hier im Tutor)
-#   ai_backends           – Ollama-Ping und status() (Kapazitäts-Frage)
-#   state.push_log(...)   – nur Logging, lazy + in try/except
-# Erlaubt ist genau das, was in memory/system/bauplan_kern.md unter „Türen"
-# steht (der Test tests/test_kern_bauplan.py wacht darüber).
+# ── Die eine Regel ──────────────────────────────────────────────────────
+# Kein Import außerhalb dieses Repos — weder ZENTRALE-Kern noch sonst etwas
+# von dort (tests/test_tutor_grenze.py). Mit dem Hub redet der Tutor nur über
+# HTTP: er nimmt Ereignisse an (POST /hub/ereignis), mehr nicht.
 
 # ── Sprache = Ordner (tutor/langs/<code>/) ──────────────────────────────
 # Der Tutor ist ein FRAMEWORK, kein Chinesisch-Tutor. Alles, was eine Sprache
@@ -33,5 +24,5 @@
 # Allowlist in tutor/tools.py (_ALLOWED).
 #
 # ── Secrets ─────────────────────────────────────────────────────────────
-# Hier liegt KEIN API-Key. Der Key-Store gehört dem Core (data/ai_config.json)
-# und injiziert in os.environ; tutor/config.py hält nur Provider/Modell/Regler.
+# Im Repo liegt KEIN Schlüssel. Der eigene Schlüssel steht in
+# ~/.config/language-tutor/schluessel (tutor/modell/schluessel.py).

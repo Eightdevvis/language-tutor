@@ -1,0 +1,18 @@
+# Lernstände, Gedächtnis, Kosten — Sashas Daten, nie ins Repo
+tutor/data/*
+!tutor/data/tutor_config.json.example
+data/
+
+# Schlüssel und Zugang (liegen sowieso in ~/.config/language-tutor — nur zur Sicherheit)
+schluessel
+zugang
+*.schluessel
+.env
+*.key
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

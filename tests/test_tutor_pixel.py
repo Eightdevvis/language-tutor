@@ -63,13 +63,12 @@ def test_ein_frame_ohne_absturz(thema, w, h):
 
 
 def test_optik_einstellung(monkeypatch):
-    import ai_config
-    import tutor_port
-    monkeypatch.setattr(ai_config, "_overrides", {})
-    monkeypatch.delenv("ZENTRALE_TUTOR_OPTIK", raising=False)
-    monkeypatch.setattr(ai_config, "_config", {})
-    assert tutor_port.optik() == "pixel", "Standard: pixel"
-    ai_config.set_override("tutor_optik", "alt")
-    assert tutor_port.optik() == "alt"
-    ai_config.set_override("tutor_optik", "quatsch")
-    assert tutor_port.optik() == "pixel", "Tippfehler → kein leeres Bild"
+    """Seit 2026-10-09 eine Einstellung des Tutors (vorher ZENTRALEs ai_config)."""
+    from tutor import config, dienst
+    monkeypatch.setattr(config, "_overrides", {})
+    monkeypatch.delenv("TUTOR_TUTOR_OPTIK", raising=False)
+    assert dienst.optik() == "pixel", "Standard: pixel"
+    config.set_override("tutor_optik", "alt")
+    assert dienst.optik() == "alt"
+    config.set_override("tutor_optik", "quatsch")
+    assert dienst.optik() == "pixel", "Tippfehler → kein leeres Bild"

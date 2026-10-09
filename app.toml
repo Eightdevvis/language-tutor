@@ -1,0 +1,23 @@
+# app.toml — was der Sprach-Tutor als App vom Hub (ZENTRALE) will.
+# Format: Hub-Bauplan (ZENTRALE memory/system/hub_bauplan.md), Stand 2026-10-09.
+
+name      = "tutor"
+version   = "0.5.0"
+titel     = "Sprach-Tutor"
+
+# Eigener Prozess. „python" ersetzt der Hub durch den Python dieser App
+# (venv im App-Ordner, sonst seinen eigenen).
+start     = "python -m tutor.server"
+adresse   = "http://127.0.0.1:5070"     # wo der Server lauscht (Einstellung host/port)
+
+ansichten = ["terminal", "fenster"]     # leicht / schick
+rechte    = ["modell", "ereignis:anwesenheit", "mikro", "lautsprecher"]
+liefert   = []                          # später: "ereignis:tutor.gelernt"
+
+[ansicht.fenster]
+start = "python tutor/room.py"          # das Zimmer (pygame)
+
+[ereignisse]
+# Abonnierte Ereignisse schickt der Hub als POST <adresse>/hub/ereignis
+# mit {"name": "...", "daten": {...}}.
+ziel = "/hub/ereignis"

@@ -1,4 +1,4 @@
-"""Der Bauplan (memory/tutor/bauplan.md) gegen den Code — damit er nicht driftet.
+"""Der Bauplan (docs/bauplan.md) gegen den Code — damit er nicht driftet.
 
 Sasha 2026-09-17: das Dokument muss kontinuierlich synchron bleiben, alle
 Verzeichnisse und Artefakte enthalten. Hoffen reicht nicht: dieser Test liest
@@ -17,7 +17,7 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-BAUPLAN = os.path.join(ROOT, "memory", "tutor", "bauplan.md")
+BAUPLAN = os.path.join(ROOT, "docs", "bauplan.md")
 
 
 def _text():
@@ -57,25 +57,22 @@ def test_jeder_pfad_im_bauplan_existiert():
 
 def test_jedes_tutor_modul_steht_im_bauplan():
     pfade = set(_erste_zellen(_abschnitt(_text(), "Verzeichnisbaum")))
-    module = sorted(f for f in os.listdir(os.path.join(ROOT, "tutor"))
-                    if f.endswith(".py"))
-    fehlend = ["tutor/" + m for m in module if "tutor/" + m not in pfade]
+    module = []
+    for ordner in ("tutor", os.path.join("tutor", "modell")):
+        module += [ordner.replace(os.sep, "/") + "/" + f
+                   for f in sorted(os.listdir(os.path.join(ROOT, ordner)))
+                   if f.endswith(".py")]
+    fehlend = [m for m in module if m not in pfade]
     assert not fehlend, "Modul ohne Zeile im Bauplan: %s" % fehlend
 
 
 # ── 3. Routen ────────────────────────────────────────────────────────────
 
 def _routen_im_code():
-    """Seit 2026-10-06 liegen die Routen nach Bereich in ui/routen/ (app.py
-    hängt sie nur ein) — gesucht wird deshalb im ganzen Paket."""
-    dateien = [os.path.join(ROOT, "ui", "app.py")] + sorted(
-        os.path.join(ROOT, "ui", "routen", f)
-        for f in os.listdir(os.path.join(ROOT, "ui", "routen")) if f.endswith(".py"))
-    src = ""
-    for pfad in dateien:
-        with open(pfad, encoding="utf-8") as f:
-            src += f.read()
-    return set(re.findall(r"@(?:app|bp)\.route\('(/api/(?:tutor[^']*|speak|transcribe))'", src))
+    """Seit 2026-10-09 hat der Tutor seinen eigenen Server (tutor/server.py)."""
+    with open(os.path.join(ROOT, "tutor", "server.py"), encoding="utf-8") as f:
+        src = f.read()
+    return set(re.findall(r'@app\.route\("(/[^"]*)"', src))
 
 
 def test_routen_stimmen_in_beide_richtungen():
@@ -147,10 +144,3 @@ def test_kategorien_der_kernwoerter_kennt_das_zimmer():
     for code, prof in _pakete():
         fremd = sorted({e.get("category") for e in prof["core_vocab"]} - bekannt)
         assert not fremd, "%s: Kategorien ohne Beschriftung im Zimmer: %s" % (code, fremd)
-
-
-def test_tts_engine_fuer_jede_aktive_sprache():
-    src = open(os.path.join(ROOT, "services", "tts_service.py"), encoding="utf-8").read()
-    for code, prof in _pakete():
-        assert re.search(r"_engines\[['\"]%s['\"]\]|['\"]%s['\"]\s*:" % (code, code), src) \
-            or ("_try_load_%s" % code) in src, "%s: keine TTS-Engine in tts_service.py" % code

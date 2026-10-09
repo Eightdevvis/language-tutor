@@ -21,6 +21,7 @@
 import json
 import os
 
+from . import pfade
 from . import staende   # Spielstaende: welcher Lernstand gerade laeuft
 from threading import Lock
 from datetime import datetime, timezone
@@ -32,7 +33,7 @@ except Exception:                       # Lib nicht installiert → Feature stil
     _OK = False
 
 _lock = staende.stand_lock   # dieselbe Sperre wie tools/staende (kein Bluten)
-_DATA_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+_DATA_ROOT = pfade.daten_ordner()   # seit 2026-10-09 wählbar (tutor/pfade.py)
 _sched = None
 
 _RATINGS = {}

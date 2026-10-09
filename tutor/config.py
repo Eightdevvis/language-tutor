@@ -1,116 +1,111 @@
 # tutor/config.py
 #
-# Lokale Tutor-Konfiguration aus tutor/data/tutor_config.json – damit man NICHT
-# bei jedem Start die Modell-Wahl per `export` ins Terminal halten muss.
-# Ideal zum Durchprobieren mehrerer Modelle: Datei editieren, neu starten.
-# Hält NUR: provider / model / history_window / native und die Regler
-# max_tokens / temperature / effort (tutor/anbieter.py).
-# Seit 2026-09-17 KEIN 'lang' mehr: die Sprache kommt aus dem aktiven Spielstand
-# (tutor/staende.py) — ein Wert hier würde ignoriert. 'native' = Muttersprache
-# (Glosse auf Karten/Gedanken), Default 'en'.
+# Die Einstellungen des Tutors — seine eigenen, nicht mehr die von ZENTRALE.
 #
-# ── KEINE Keys hier (Umbau 2026-07-16) ──────────────────────────────────
-# Der API-Key-Store gehört dem KERN (core/ai_config.py → data/ai_config.json)
-# und injiziert die Keys beim Import in os.environ; der Cloud-Pfad
-# (seit 2026-10-08 der Kern selbst, tutor/anbieter.py → kern.fahren) liest sie von dort. Vorher lagen die
-# Keys hier — und weil ai_backends dafür in den Tutor griff, hing der halbe Kern
-# an einer Tutor-Datei. Das ist jetzt getrennt: tutor/data/ enthält NIE ein
-# Secret, damit ein vergessener .gitignore-Eintrag hier nichts leaken kann.
-# NICHT wieder Keys hier reinlegen.
+# Seit 2026-10-09 (eigenes Repo, eigener Prozess) liest der Tutor nichts mehr
+# aus ZENTRALEs ai_config. Was vorher dort stand (tutor_optik, whisper_url,
+# tts_url, default_lang, tutor_presence_react), steht jetzt hier.
 #
-# Standalone (tutor/ als eigenes Projekt, ohne ZENTRALE): dann kommen die Keys
-# aus der Env (`export DASHSCOPE_API_KEY=…`) — hier bleibt es bei der Wahl.
+# ── Woher ein Wert kommt (erste Quelle gewinnt) ─────────────────────────
+#   Laufzeit-Wechsel (set_override)  >  Env TUTOR_<NAME>
+#   >  ~/.config/language-tutor/einstellungen.json
+#   >  <daten>/tutor_config.json (die alte Datei: provider/model/native)
+#   >  Standard unten.
 #
-# ── Sicherheit ──────────────────────────────────────────────────────────
-# tutor/data/*.json ist in .gitignore → die Datei wandert NIE ins Repo.
-# Vorlage: tutor/data/tutor_config.json.example.
-#
-# ── Precedence ──────────────────────────────────────────────────────────
-#   Env-Var  >  Config-Datei  >  Legacy-Datei  >  Profil-Default
-# So bleibt die Config der bequeme Default, ein einmaliges `TUTOR_PROVIDER=…`
-# im Terminal übersteuert sie aber für ein schnelles Experiment.
-#
-# ── Migration ───────────────────────────────────────────────────────────
-# Gelesen wird tutor/data/tutor_config.json; fehlt ein Wert, greift die alte
-# Heimat data/tutor_config.json (Legacy). Damit laufen Knoten, die den
-# tutor/-Ordner noch nicht haben, unverändert weiter. Geschrieben wird immer
-# die neue Datei.
+# KEINE Schlüssel hier. Die liegen in einer eigenen Datei
+# (tutor/modell/schluessel.py), damit diese Datei gefahrlos gezeigt und
+# kopiert werden kann.
 
-import os
 import json
+import os
 
-_DIR         = os.path.dirname(os.path.abspath(__file__))
-_CONFIG_PATH = os.path.join(_DIR, "data", "tutor_config.json")
-_LEGACY_PATH = os.path.join(_DIR, "..", "data", "tutor_config.json")
+from . import pfade
 
-_config = {}
-_legacy = {}
+# Alle Einstellungen mit Standardwert — eine Liste, damit niemand raten muss.
+STANDARD = {
+    # Modell
+    "ziel":              "direkt",   # direkt = eigener Schlüssel | hub = Sashas Server (noch nicht da)
+    "provider":          None,       # None → das Sprachprofil entscheidet
+    "model":             None,
+    "history_window":    30,
+    "max_tokens":        None,       # None → je Anbieter-Art (anbieter.py)
+    "temperature":       0.4,
+    "effort":            "low",
+    "monatsbudget_euro": 5.0,        # Deckel für Cloud-Kosten des Tutors je Monat
+    "hub_url":           "",         # später: Sashas Server (ziel = hub)
+    "ollama_url":        "http://localhost:11434",
+    "ollama_model":      "qwen3.5:9b",
+    # Lernen
+    "native":            "en",       # Muttersprache (Glosse auf Karten)
+    # Zimmer, Stimme
+    "tutor_optik":       "pixel",    # pixel | alt
+    "whisper_url":       "http://localhost:5050",
+    "tts_url":           "http://localhost:5051",
+    "default_lang":      "de",
+    "presence_react":    "1",        # 0 = auf „jemand ist da" nicht reagieren
+    # Server
+    "host":              "127.0.0.1",
+    "port":              5070,
+}
+
+_overrides = {}   # Laufzeit-Wechsel (aus dem Zimmer, ohne Neustart)
 
 
-def _read(path: str) -> dict:
-    if not os.path.exists(path):
+def _lesen(pfad: str) -> dict:
+    if not os.path.exists(pfad):
         return {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(pfad, "r", encoding="utf-8") as f:
             return json.load(f) or {}
     except Exception as e:
-        print(f"[tutor.config] {path} konnte nicht gelesen werden: {e}")
+        print(f"[tutor.config] {pfad} konnte nicht gelesen werden: {e}")
         return {}
 
 
-def _load():
-    global _config, _legacy
-    _config = _read(_CONFIG_PATH)
-    _legacy = _read(_LEGACY_PATH)
-
-
-_overrides = {}   # Runtime-Overrides (Live-Umschalten in ZENTRALE, ohne Neustart)
-
-_load()
+def _alte_datei() -> str:
+    return os.path.join(pfade.daten_ordner(), "tutor_config.json")
 
 
 def setting(name: str, default=None):
-    """Wert für eine Tutor-Einstellung.
-    Precedence: Runtime-Override > Env (TUTOR_<NAME>) > tutor/data/tutor_config.json
-    > data/tutor_config.json (Legacy) > default.
-    Einstellungen: provider, model, history_window, native."""
-    if name == "native" and default is None:
-        default = "en"
+    """Wert einer Einstellung (Reihenfolge siehe Kopf). default=None → der
+    Standard aus STANDARD."""
+    if default is None:
+        default = STANDARD.get(name)
     if name in _overrides:
         return _overrides[name]
     env = os.environ.get("TUTOR_" + name.upper())
     if env not in (None, ""):
         return env
-    for src in (_config, _legacy):
-        val = src.get(name)
+    for quelle in (_lesen(pfade.einstellungen_datei()), _lesen(_alte_datei())):
+        val = quelle.get(name)
         if val not in (None, ""):
             return val
     return default
 
 
 def set_override(name: str, value, persist: bool = False):
-    """Setzt eine Einstellung zur LAUFZEIT (live, ohne Neustart). Leerer Wert
-    löscht den Override. persist=True schreibt zusätzlich in
-    tutor/data/tutor_config.json (überlebt Neustart)."""
+    """Setzt eine Einstellung zur Laufzeit. Leerer Wert löscht den Wechsel.
+    persist=True schreibt sie zusätzlich in einstellungen.json."""
     if value in (None, ""):
         _overrides.pop(name, None)
     else:
         _overrides[name] = value
     if persist:
-        if value in (None, ""):
-            _config.pop(name, None)
-        else:
-            _config[name] = value
-        _save()
+        _speichern(name, value)
 
 
-def _save():
-    """Schreibt die Tutor-Wahl zurück nach tutor/data/tutor_config.json.
-    Die Legacy-Datei (data/tutor_config.json) wird NIE geschrieben — dort liegen
-    auf alten Knoten noch Keys, die gehören uns nicht mehr."""
+def _speichern(name: str, value):
+    pfad = pfade.einstellungen_datei()
+    daten = _lesen(pfad)
+    if value in (None, ""):
+        daten.pop(name, None)
+    else:
+        daten[name] = value
     try:
-        os.makedirs(os.path.dirname(_CONFIG_PATH), exist_ok=True)
-        with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(_config, f, indent=2, ensure_ascii=False)
+        os.makedirs(os.path.dirname(pfad), exist_ok=True)
+        tmp = pfad + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(daten, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, pfad)
     except Exception as e:
         print(f"[tutor.config] Speichern fehlgeschlagen: {e}")

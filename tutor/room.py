@@ -10,11 +10,12 @@
 #
 # Architektur = Renderer-Prinzip: dieses File ZEICHNET nur + spricht die
 # Tutor-API. Keine KI-Logik hier — Session/Sprache/Persona/Memory leben im
-# Backend (tutor/session.py, /api/tutor/*). Die Antworten kommen als SSE-
-# Token-Stream (wie im Browser/TUI), landen in einer Sprechblase.
+# Tutor-Server (tutor/server.py, /api/tutor/*; seit 2026-10-09 ein eigener
+# Prozess, vorher in ZENTRALE). Die Antworten kommen als SSE-Token-Stream und
+# landen in einer Sprechblase.
 #
-# Start:
-#   venv/bin/python tutor/room.py [--url http://host:5000]
+# Start (Server muss laufen, siehe README):
+#   python tutor/room.py [--url http://host:5070]
 # Steuerung:
 #   tippen + Enter   an die Persona reden
 #   Backspace        löschen
@@ -349,7 +350,7 @@ def _sym(text):
 class Backend:
     def __init__(self, url):
         self.url = url.rstrip('/')
-        __import__((__package__ + '.' if __package__ else '') + 'room_zugang', fromlist=['_']).einrichten(self.url)   # Zugangsschlüssel mitschicken (memory/betrieb/zugang.md)
+        __import__((__package__ + '.' if __package__ else '') + 'zugang', fromlist=['_']).einrichten(self.url)   # Zugangsschlüssel mitschicken (tutor/zugang.py)
 
     def _get(self, path, timeout=3.0):
         try:
@@ -2192,7 +2193,10 @@ def draw_assessment(screen, w, h, fonts, asv, speaking, caret_t):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--url', default=os.environ.get('ZENTRALE_URL', 'http://localhost:5000'))
+    # Seit 2026-10-09 spricht das Zimmer mit dem eigenen Tutor-Server, nicht
+    # mehr mit ZENTRALE (TUTOR_URL; ZENTRALE_URL meint jetzt nur noch den Hub,
+    # für den Blick in die TUI per Alt+Z).
+    ap.add_argument('--url', default=os.environ.get('TUTOR_URL', 'http://localhost:5070'))
     ap.add_argument('--w', type=int, default=920)
     ap.add_argument('--h', type=int, default=600)
     # Vollbild ist der Normalfall: das Zimmer haengt an der Wand, dort gibt es
@@ -2218,7 +2222,7 @@ def main():
     a = ap.parse_args()
 
     pygame.init()
-    pygame.display.set_caption('ZENTRALE — Persona')
+    pygame.display.set_caption('Sprach-Tutor')
 
     # Wie gross ist der Bildschirm wirklich? Nicht raten: der Pi an der Wand
     # haengt an einem anderen Geraet als der Laptop, und ein festes 920x600
@@ -3241,21 +3245,25 @@ def main():
         oeffnete ihr 'u' ein zweites, das sich mit diesem ums Mikro streitet.
 
         Bewusst per xterm + System-python3 (die TUI ist stdlib-only) und ohne
-        Import aus dem Projekt — room.py bleibt fuer sich lauffaehig."""
+        Import aus dem Projekt — room.py bleibt fuer sich lauffaehig.
+
+        Seit 2026-10-09 (eigenes Repo) kennt das Zimmer den Ort der TUI nicht
+        mehr selbst: der Hub, der das Zimmer startet, sagt ihn per Env
+        ZENTRALE_TUI (Pfad zu zentrale_tui.py) und ZENTRALE_URL (Hub-Adresse).
+        Ohne Hub gibt es hier eben keine TUI."""
         p = TUI.get('proc')
         if p is not None and p.poll() is None:
             with S['lock']:
                 S['msg'] = 'tui läuft schon'
             return
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        tui = os.path.join(root, 'tui', 'zentrale_tui.py')
-        if not os.path.exists(tui) or not os.environ.get('DISPLAY'):
+        tui = os.environ.get('ZENTRALE_TUI') or ''
+        root = os.path.dirname(os.path.dirname(tui)) if tui else ''
+        if not tui or not os.path.exists(tui) or not os.environ.get('DISPLAY'):
             with S['lock']:
                 S['msg'] = 'keine tui hier'
             return
         fs = os.environ.get('ZENTRALE_TUI_FONTSIZE', '16')
-        env = dict(os.environ, TERM='xterm-256color', ZENTRALE_URL=a.url,
-                   ZENTRALE_ROOM_PARENT='1')
+        env = dict(os.environ, TERM='xterm-256color', ZENTRALE_ROOM_PARENT='1')
         try:
             TUI['proc'] = subprocess.Popen(
                 ['xterm', '-maximized', '-u8', '-fa', 'Monospace', '-fs', fs,
