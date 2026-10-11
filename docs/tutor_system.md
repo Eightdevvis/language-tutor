@@ -425,6 +425,23 @@ ZENTRALE-Drossel (`ai_backends.cloud_enabled()`/`local_enabled()`, je nach
 `tutor_port.unavailable_reason()` — an genau EINER Stelle formuliert, Fronten
 geben ihn wörtlich weiter (Felder: `../system/api_endpoints.md`).
 
+### Fallen der Anthropic-API (Weg `tutor/modell/weg_anthropic.py`)
+
+Stand 2026-10-11, übernommen aus ZENTRALE `memory/ki/ki_system.md`
+(„Fallen der aktuellen API", galt dort schon für den alten `tutor/cloud.py`):
+
+- `temperature` / `top_p` / `top_k` → **400**. Deshalb setzt nur der
+  OpenAI-kompatible Weg `temperature` (`tutor/anbieter.py`, Standard 0.4),
+  der Anthropic-Weg nie.
+- `thinking: {budget_tokens: N}` → **400**. Gesteuert wird über `effort`
+  (der Weg schickt bei Modellen aus `_DENKT_ADAPTIV` `thinking: adaptive` +
+  `output_config.effort`, Standard `low`).
+- `max_tokens` deckelt **Denken UND Antwort zusammen** — zu knapp heißt, die
+  Antwort bricht ab, nachdem das Denken das Budget aufgefressen hat.
+- `thinking: disabled` schreibt Tool-Calls gelegentlich als Fließtext statt
+  als `tool_use`-Block; der Call läuft dann nie, ohne Fehler. Deshalb Denken
+  an lassen, notfalls `effort: low`.
+
 ## Position in der Architektur
 
 ⚠ prüfen: dieser Abschnitt beschreibt den Stand vor dem Auszug (Naht
