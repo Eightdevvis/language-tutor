@@ -1,5 +1,13 @@
 # Tutor: Tool-Beschreibungen (12 Tools)
 
+⚠ prüfen (2026-10-11): die Tabellen unten führen noch Legacy-Tools
+(`get_confirmed_vocab`, `get_testing_vocab`, `mark_known`,
+`increment_correct_use`) und alte Dateinamen (`vocab_*.json`,
+`structures_mandarin.json`, `persona_news_zh.json`, `pinyin`). Die gültige
+Liste der 12 Tools steht in `_TOOL_SPECS`/`_ALLOWED` (`tutor/tools.py`) und in
+`docs/tutor_system.md` → „Tutor-Tools (Sandbox)"; die Trennung zur lokalen KI
+dort unter „Cloud→Lokal-Trennung".
+
 - **Quelle:** `tutor/tools.py` → `_TOOL_SPECS` + `tools_for(lang)` (Schema) und
   `_ALLOWED` (Ausführung). Die früher statische `TUTOR_TOOLS`-Liste **gibt es
   nicht mehr**: sie trug chinesische Beschreibungen und ein `pinyin`-Feld, also

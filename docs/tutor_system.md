@@ -427,6 +427,10 @@ geben ihn wörtlich weiter (Felder: `../system/api_endpoints.md`).
 
 ## Position in der Architektur
 
+⚠ prüfen: dieser Abschnitt beschreibt den Stand vor dem Auszug (Naht
+`core/tutor_port.py`, Kern-Importe). Heute: eigener Prozess, kein Import aus
+ZENTRALE — `bauplan.md` Abschnitt 1 und unten „Cloud→Lokal-Trennung".
+
 Tutor ist ein **Addon** auf der Core-AI, nicht der Owner der Voice-Pipeline.
 STT und TTS leben zentral in `services/` und sind sprachneutral nutzbar via
 `/api/transcribe` und `/api/speak` (`../ki/audio_system.md`); der Tutor ruft
@@ -469,6 +473,54 @@ sichtbar sein). Beschriftung je Sprache aus `tool_texts.json`.
 `increment_correct_use`, `mark_known` (Zählmodell `confirmed`/`correct_use`,
 siehe Historie) — die KI zählt nicht mehr. ALLE Tools fassen nur Daten des
 aktiven Standes + UI-State an, nie die Core-KI (`tutor_roleplay_features.md`).
+
+### Cloud→Lokal-Trennung (HARTE Invariante)
+
+**Stand 2026-10-11** (aus ZENTRALE `memory/claude_hinweise.md` hierher
+verschoben, an den Code von heute angeglichen): Die Tutor-KI (meist auf einem
+Cloud-Anbieter) darf **nie** in Sashas lokale KI greifen — weder in den
+Assistenten von ZENTRALE noch in dessen Gedächtnis oder Verdichtung. Was sie
+sieht und anfassen kann, ist GENAU:
+
+- ihren System-Prompt, gebaut von `session._system_bauen` (Persona-Prompt der
+  Sprache + Vokabel-Status + Niveau + Kern-Hinweis + **ihr eigenes**
+  Persona-Gedächtnis aus `tutor/memory.py`),
+- ihre eigene Tutor-History,
+- die **12 Tutor-Tools** (`tutor.tools.tools_for(lang)`, Tabelle oben). Die
+  fassen an: die Dateien des aktiven Spielstands
+  (`<datenordner>/staende/<id>/<lang>/…`, `tutor/pfade.py`) und den
+  **UI-Zustand des Zimmers** (`express`, `show_thought`, `watch_tv`,
+  `play_music` …) — mehr nicht.
+
+Durchgesetzt durch:
+
+- **Choke-Point `tutor.tools.execute_tool`** — geschlossene Allowlist
+  `_ALLOWED`; jeder andere Tool-Name wird abgelehnt, auf stdout geflaggt
+  (`⚠ TUTOR-SANDBOX: …`) und als `ai.tool`-Ereignis an die Devtools gemeldet.
+- **Eigene Werkzeug-Schleife** `tutor/modell/schleife.py` (portiert aus dem
+  `tutor_mode` von ZENTRALEs Schleife): kein Erlaubnis-Gate, keine
+  Kern-Werkzeuge, keine Bild-Marker, nichts ins Gedächtnis des Assistenten.
+  `tools=None` heißt hier „keine Werkzeuge", nicht wie in ZENTRALE „alle
+  Kern-Werkzeuge".
+- **Repo-Grenze** (seit 2026-10-09): kein Import und kein Dateipfad in
+  ZENTRALEs Code; die Leitung bekommt nur Tutor-Prompt und Tutor-Werkzeuge —
+  `tests/test_tutor_grenze.py`.
+
+Bis 2026-10-09 lief der Tutor über ZENTRALEs `ai.py`/`core/cloud.py`; dort
+schalteten Gates (`if tools is None` bzw. `tutor_mode = tools is not None`)
+Gedächtnis-Injektion, Consolidation, Graph, Bild-Marker und Jetzt-Block ab.
+Diese Gates leben weiter in ZENTRALE (deren Doku), der Tutor braucht sie
+nicht mehr.
+
+Wer hier etwas ändert (neues Tutor-Tool, ein anderes Tool-Set an die Leitung
+hängen), weicht diese Trennung bewusst auf — im Zweifel sein lassen. Neues
+Tool nur, wenn es wirklich nur tutor-eigene Daten berührt.
+
+⚠ prüfen: Code-Kommentare nennen noch alte Pfade — `tutor/tools.py` (Kopf des
+Dispatchers) `tutor/data/<lang>/`, `tutor/__init__.py` (Sandbox)
+`tutor/data/<lang>/persona_mem.json` und ZENTRALEs `data/ai_graph.json` (Graph
+ist in ZENTRALE seit 2026-08 aus, Gedächtnis dort heute dateibasiert). Gemeint
+ist heute `staende/<id>/<lang>/…`.
 
 ## Bedienung
 
@@ -522,3 +574,6 @@ aktiven Standes + UI-State an, nie die Core-KI (`tutor_roleplay_features.md`).
   `native` als Einstellung; Bauplan + Drift-Test; Ling Ling auf Lucías vollem
   Bauplan; Lena (`de`) als dritte Sprache; das Zwischenmenü friert auch Leiste
   und Stimme ein.
+- **2026-10-11** — Abschnitt „Cloud→Lokal-Trennung" aus ZENTRALE
+  (`memory/claude_hinweise.md`) hierher verschoben und an den Code nach dem
+  Auszug angeglichen (eigene Schleife, Repo-Grenze statt `ai.py`-Gates).

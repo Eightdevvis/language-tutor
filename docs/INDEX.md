@@ -26,3 +26,7 @@ Der Tutor hat sein **eigenes** Gedächtnis (`tutor/memory.py`, Notiz-Modell) —
 **nicht** das Gedächtnis von Sashas Assistenten in ZENTRALE. Die beiden
 Speicher fassen sich nie an, und seit dem Umzug kann der Tutor auch keinen
 Code von ZENTRALE mehr aufrufen (`tests/test_tutor_grenze.py`).
+
+Die harte Cloud→Lokal-Trennung (was die Tutor-KI sieht, Choke-Point
+`_ALLOWED`, wer sie aufweicht): [tutor_system.md](tutor_system.md) →
+„Cloud→Lokal-Trennung".
